@@ -24,6 +24,11 @@ function tickets() {
   const [emailSending, setEmailSending] = useState(false);
   // validation handled with toast notifications instead of inline UI
   const ticketRef = useRef<HTMLDivElement | null>(null);
+  // Resolve backend API base depending on environment
+  const API_BASE =
+    typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'http://localhost:4000'
+      : 'https://ticket-backend-davetechinnovation1440-jgqqgsbi.leapcell.dev';
 
   // Load persisted form state (amount, email, phone, step) from localStorage on mount
   useEffect(() => {
@@ -290,7 +295,7 @@ function tickets() {
                   setLoading(true);
                   try {
                     const resp = await fetch(
-                      "https://ticket-backend-davetechinnovation1440-jgqqgsbi.leapcell.dev/api/tickets",
+                      `${API_BASE}/api/tickets`,
                       {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -353,7 +358,7 @@ function tickets() {
                           try {
                             setEmailSending(true);
                             const emailResp = await fetch(
-                              "https://ticket-backend-davetechinnovation1440-jgqqgsbi.leapcell.dev/api/tickets/email",
+                              `${API_BASE}/api/tickets/email`,
                               {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
@@ -425,22 +430,37 @@ function tickets() {
               <button
                 onClick={async () => {
                   try {
-                    toast("Resending ticket...");
-                    const resp = await fetch(
-                      "https://ticket-backend-davetechinnovation1440-jgqqgsbi.leapcell.dev/api/tickets/email",
-                      {
+                    const node = ticketRef.current;
+                    if (!node) {
+                      toast.error("Ticket view not ready to resend");
+                      return;
+                    }
+                    setEmailSending(true);
+                    const originalFont = node.style.fontFamily;
+                    try {
+                      node.style.fontFamily = 'Arial, Roboto, system-ui, -apple-system, "Segoe UI", sans-serif';
+                      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+                      await new Promise((r) => setTimeout(r, 200));
+                      const dataUrl = await toJpeg(node, {
+                        quality: 0.9,
+                        backgroundColor: "#ffffff",
+                        width: 330,
+                        pixelRatio: 2,
+                      });
+                      const resp = await fetch(`${API_BASE}/api/tickets/email`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ ticketId, to: email }),
+                        body: JSON.stringify({ ticketId, to: email, imageDataUrl: dataUrl }),
+                      });
+                      if (!resp.ok) {
+                        const body = await resp.json().catch(() => ({}));
+                        toast.error(body?.error || `Email failed (${resp.status})`);
+                      } else {
+                        toast.success(`Ticket resent to ${email}`);
                       }
-                    );
-                    if (!resp.ok) {
-                      const body = await resp.json().catch(() => ({}));
-                      toast.error(
-                        body?.error || `Email failed (${resp.status})`
-                      );
-                    } else {
-                      toast.success(`Ticket resent to ${email}`);
+                    } finally {
+                      try { node.style.fontFamily = originalFont || ""; } catch {}
+                      setEmailSending(false);
                     }
                   } catch (e) {
                     console.error("resend failed", e);

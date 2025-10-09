@@ -72,19 +72,37 @@ function Verify() {
     const confirmOk = window.confirm('Mark this ticket as invalid/used? This cannot be undone easily.');
     if (!confirmOk) return;
     try {
-  const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:4000'
-    : 'https://ticket-backend-davetechinnovation1440-jgqqgsbi.leapcell.dev';
+      const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:4000'
+        : 'https://ticket-backend-davetechinnovation1440-jgqqgsbi.leapcell.dev';
+
       const resp = await fetch(`${API_BASE}/api/tickets/${encodeURIComponent(ticket.ticketId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ used: true }),
       });
+
       if (!resp.ok) {
+        // If the backend reports an error (e.g. 404), re-fetch the ticket to see its real state.
+        try {
+          const check = await fetch(`${API_BASE}/api/tickets/${encodeURIComponent(ticket.ticketId)}`);
+          if (check.ok) {
+            const data = await check.json();
+            if (data?.used) {
+              setTicket(data);
+              setStatus('used');
+              toast.success('Ticket marked as used');
+              return;
+            }
+          }
+        } catch (_) {
+          // ignore fetch fallback errors
+        }
         const body = await resp.json().catch(() => ({}));
         toast.error(body?.error || `Update failed (${resp.status})`);
         return;
       }
+
       const updated = await resp.json();
       setTicket(updated);
       setStatus('used');
