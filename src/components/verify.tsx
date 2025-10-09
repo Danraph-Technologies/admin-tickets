@@ -9,8 +9,7 @@ function Verify() {
   const [loading, setLoading] = useState(false);
   const [ticket, setTicket] = useState<any | null>(null);
   const [status, setStatus] = useState<'idle' | 'success' | 'used' | 'fake'>('idle');
-  const [debug, setDebug] = useState<{ url?: string; status?: number; statusText?: string; body?: any } | null>(null);
-
+  
   // Do NOT persist verification across reloads — verification resets on page load.
 
   const handlePinSubmit = (pin: string) => {
@@ -35,23 +34,16 @@ function Verify() {
     ? 'http://localhost:4000'
     : 'https://ticket-backend-davetechinnovation1440-jgqqgsbi.leapcell.dev';
     const reqUrl = `${API_BASE}/api/tickets/${encodeURIComponent(id)}`;
-    setDebug({ url: reqUrl });
-    setLoading(true);
+        setLoading(true);
     fetch(reqUrl)
       .then(async (r) => {
-        setDebug((d) => ({ ...(d || {}), status: r.status, statusText: r.statusText }));
-        if (r.status === 404) {
-          const text = await r.text().catch(() => '');
-          setDebug((d) => ({ ...(d || {}), body: text }));
+                if (r.status === 404) {
           throw new Error('not-found');
         }
         if (!r.ok) {
-          const text = await r.text().catch(() => '');
-          setDebug((d) => ({ ...(d || {}), body: text }));
           throw new Error('network');
         }
         const json = await r.json();
-        setDebug((d) => ({ ...(d || {}), body: json }));
         return json;
       })
       .then((data) => {
