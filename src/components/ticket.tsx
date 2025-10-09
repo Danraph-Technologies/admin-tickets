@@ -40,13 +40,16 @@ function Ticket({
     });
 
   return (
-    <div className="flex justify-center items-center h-screen">
+    <div className="flex justify-center items-center">
       <div
         ref={rootRef}
         className="bg-white max-w-[330px] w-full border "
         style={{ width: 320 }}
       >
         <p className="text-right p-3 font-bold ">{amount}</p>
+        <div className="flex justify-center items-center ">
+          <img src="/logo1.png" alt="" className="w-[100px] h-[100px] "/>
+        </div>
         <div className="text-center">
           <h2 className="text-[25px] font-semibold ">DanRaph Ecocruise</h2>
           <p className="font-[Montserrat] text-[15px] ">
