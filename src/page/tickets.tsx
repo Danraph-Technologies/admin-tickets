@@ -477,13 +477,13 @@ function tickets() {
                     toast.error("Resend failed");
                   }
                 }}
-                className="bg-gray-100 cursor-pointer text-gray-800 px-4 py-2 rounded-md"
+                className="bg-gray-100 cursor-pointer text-gray-800 text-[14px] sm:text-[16px] px-2 sm:px-4 py-2 rounded-md"
               >
                 Resend Email
               </button>
               <button
                 type="button"
-                className="bg-blue-700 text-white px-4 py-2 rounded-md hover:bg-blue-600 cursor-pointer hover:scale-105 duration-300 transition-all"
+                className="bg-blue-700 text-white text-[14px] sm:text-[16px]  px-2 sm:px-4 py-2 rounded-md hover:bg-blue-600 cursor-pointer hover:scale-105 duration-300 transition-all"
                 onClick={() => {
                   // clear all form and ticket state so we can start a new flow
                   setGenerated(false);
