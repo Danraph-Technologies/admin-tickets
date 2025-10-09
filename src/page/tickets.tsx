@@ -40,7 +40,14 @@ function tickets() {
       if (parsed?.amount) setAmount(parsed.amount);
       if (parsed?.email) setEmail(parsed.email);
       if (parsed?.phone) setPhone(parsed.phone);
+      if (typeof parsed?.generated === 'boolean') setGenerated(parsed.generated);
+      if (typeof parsed?.ticketId === 'string') setTicketId(parsed.ticketId);
+      if (typeof parsed?.dateIssued === 'string') setDateIssued(parsed.dateIssued);
       if (parsed?.step) setStep(parsed.step);
+      // If a ticket was previously generated, ensure we remain on the Ticket step after refresh
+      if (parsed?.generated && parsed?.ticketId && parsed?.dateIssued && (!parsed?.step || parsed?.step < 5)) {
+        setStep(5);
+      }
     } catch (e) {
       // ignore parse errors
       console.warn("failed to load persisted form state", e);
