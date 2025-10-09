@@ -95,30 +95,33 @@ function tickets() {
             aria-label="Go back"
             title="Go back"
             onClick={() => {
-              // If a ticket was just generated, go back to the Amount input (step 2)
-              // and reset the generated state so the user can start a new flow.
-              if (generated) {
-                setGenerated(false);
-                setTicketId(null);
-                setDateIssued(null);
-                setStep(MIN_STEP);
-                try {
-                  if (typeof window !== "undefined" && window.localStorage)
-                    window.localStorage.removeItem(STORAGE_KEY);
-                } catch (e) {
-                  /* ignore */
-                }
-                return;
-              }
-
-              // If we're inside the stepper, go back a step; otherwise navigate browser back
-              if (step > MIN_STEP) back();
-              else if (
-                typeof window !== "undefined" &&
-                window.history &&
-                window.history.length
-              )
-                window.history.back();
+            // If a ticket was just generated, go back to the Amount input (step 2)
+            // and reset the generated state so the user can start a new flow.
+            if (generated) {
+            setGenerated(false);
+            setTicketId(null);
+            setDateIssued(null);
+            setAmount("");
+            setEmail("");
+            setPhone("");
+            setStep(MIN_STEP);
+            try {
+            if (typeof window !== "undefined" && window.localStorage)
+            window.localStorage.removeItem(STORAGE_KEY);
+            } catch (e) {
+            /* ignore */
+            }
+            return;
+            }
+            
+            // If we're inside the stepper, go back a step; otherwise navigate browser back
+            if (step > MIN_STEP) back();
+            else if (
+            typeof window !== "undefined" &&
+            window.history &&
+            window.history.length
+            )
+            window.history.back();
             }}
           >
             <ArrowLeft className="cursor-pointer" />
