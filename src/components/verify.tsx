@@ -186,15 +186,6 @@ function Verify() {
             <p className="py-2 font-semibold ">Ticket Verification failed — marked as fake</p>
           </div>
         )}
-          {/* Debug info (visible when present) */}
-          {debug && (
-            <div className="mt-4 text-left text-sm text-gray-600 max-w-[600px]">
-              <p className="font-semibold">Debug</p>
-              <p>URL: {debug.url}</p>
-              <p>Status: {debug.status} {debug.statusText}</p>
-              <pre className="overflow-auto text-xs bg-gray-100 p-2 rounded mt-1">{JSON.stringify(debug.body, null, 2)}</pre>
-            </div>
-          )}
       </div>
 
       {/* modal overlay for PIN when open */}
