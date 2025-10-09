@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/:path*",
+      "has": [
+        { "type":"query", "key":"__vercel_no_override" }
+      ],
+      "destination": "/"
+    },
+    { "source": "/(.*)", "destination": "/" }
+  ]
+}

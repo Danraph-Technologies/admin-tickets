@@ -1,0 +1,6 @@
+feat(verify): add debug information for ticket verification
+
+- Add debug state to store URL, status, and response body
+- Update fetch request to log debug information
+- Display debug information in UI when available
+- Improve error handling by capturing and displaying response text
