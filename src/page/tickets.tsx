@@ -429,7 +429,7 @@ function tickets() {
           </div>
         )}
         {step === 5 && generated && ticketId && dateIssued && (
-          <div className="mt-16 sm:mt-2 sm:mb-0 mb-5 ">
+          <div className=" mt-4 sm:mt-2 sm:mb-0 mb-5 ">
             <Ticket
               amount={`₦${amount || 300}`}
               ticketId={ticketId}
