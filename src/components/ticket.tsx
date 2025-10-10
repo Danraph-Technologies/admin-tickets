@@ -48,7 +48,7 @@ function Ticket({
       >
         <p className="text-right p-3 font-bold ">{amount}</p>
         <div className="flex justify-center items-center ">
-          <img src="/logo1.png" alt="" className="w-[100px] "/>
+          <img src="/logo1.webp" alt="" className="w-[100px] "/>
         </div>
         <div className="text-center">
           <h2 className="text-[25px] font-semibold ">DanRaph Ecocruise</h2>
