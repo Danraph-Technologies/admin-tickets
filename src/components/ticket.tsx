@@ -1,4 +1,4 @@
-import { type RefObject } from "react";
+import { type RefObject, useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
 interface TicketProps {
@@ -20,6 +20,7 @@ function Ticket({
   qrValue,
   rootRef,
 }: TicketProps) {
+  const [logoLoaded, setLogoLoaded] = useState(false);
   // If ticketId is available and no explicit qrValue provided, link to the app's /verify route
   if (!qrValue && typeof window !== "undefined" && ticketId) {
     try {
@@ -39,16 +40,44 @@ function Ticket({
       year: "numeric",
     });
 
+  // When the logo finishes loading, dispatch a DOM event so external
+  // consumers (like html-to-image) can wait for the ticket to be ready.
+  useEffect(() => {
+    if (!logoLoaded) return;
+    try {
+      const root = rootRef && (rootRef as RefObject<HTMLDivElement | null>)?.current;
+      if (root) {
+        // Set the attribute again to be safe
+        root.setAttribute("data-logo-loaded", "true");
+        const ev = new CustomEvent("ticket-ready", { detail: { logoLoaded: true } });
+        root.dispatchEvent(ev);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [logoLoaded, rootRef]);
+
   return (
     <div className="flex justify-center items-center">
       <div
         ref={rootRef}
         className="bg-white max-w-[330px] w-full border "
         style={{ width: 320 }}
+        // add an attribute that external code can check: data-logo-loaded
+        data-logo-loaded={logoLoaded}
       >
         <p className="text-right p-3 font-bold ">{amount}</p>
         <div className="flex justify-center items-center ">
-          <img src="/logo1.webp" alt="" className="w-[100px] "/>
+          <img
+            src="/logo1.webp"
+            alt=""
+            className="w-[100px] "
+            onLoad={() => setLogoLoaded(true)}
+            onError={() => {
+              // Mark as loaded on error to avoid blocking forever
+              setLogoLoaded(true);
+            }}
+          />
         </div>
         <div className="text-center">
           <h2 className="text-[25px] font-semibold ">DanRaph Ecocruise</h2>

@@ -4,6 +4,37 @@ import Ticket from "../components/ticket";
 import { toJpeg } from "html-to-image";
 import { Toaster, toast } from "sonner";
 
+// Helper: wait for ticket readiness signal from the Ticket component
+// Returns true if the ticket signalled readiness before timeout, false otherwise.
+const waitForTicketReady = (root: Element | null, timeout = 3000): Promise<boolean> =>
+  new Promise((resolve) => {
+    if (!root) return resolve(false);
+    try {
+      if (root.getAttribute("data-logo-loaded") === "true") return resolve(true);
+      let tid: number;
+      const onReady = () => {
+        cleanup();
+        resolve(true);
+      };
+      const onTimeout = () => {
+        cleanup();
+        resolve(false);
+      };
+      const cleanup = () => {
+        try {
+          root.removeEventListener("ticket-ready", onReady);
+        } catch (e) {
+          /* ignore */
+        }
+        clearTimeout(tid);
+      };
+      root.addEventListener("ticket-ready", onReady, { once: true });
+      tid = setTimeout(onTimeout, timeout) as unknown as number;
+    } catch (e) {
+      resolve(false);
+    }
+  });
+
 function tickets() {
   // Steps: 1 = previous 'Generate Ticket' (already completed),
   // 2 = Input Amount, 3 = Email/Phone, 4 = Confirm Details
@@ -334,10 +365,16 @@ function tickets() {
                     // keep persisted form/ticket state so the generated ticket remains visible after reload
 
                     // Wait a tick for the ticket component to mount, then capture it
-                    setTimeout(async () => {
+                                      setTimeout(async () => {
                       try {
                         const node = ticketRef.current;
                         if (!node) return;
+
+                                          const ready = await waitForTicketReady(node, 3000);
+                                          if (!ready) {
+                                            toast.error("Ticket capture timed out. Please try again.");
+                                            return;
+                                          }
 
                         // Temporarily override the root font-family to avoid html-to-image trying
                         // to read cross-origin font CSS rules (fonts.googleapis.com) which causes
@@ -445,6 +482,11 @@ function tickets() {
                       toast.error("Ticket view not ready to resend");
                       return;
                     }
+                        const ready = await waitForTicketReady(node, 3000);
+                        if (!ready) {
+                          toast.error("Ticket capture timed out. Please try resending.");
+                          return;
+                        }
                     setEmailSending(true);
                     const originalFont = node.style.fontFamily;
                     try {
