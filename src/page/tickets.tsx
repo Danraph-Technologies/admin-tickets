@@ -4,36 +4,70 @@ import Ticket from "../components/ticket";
 import { toJpeg } from "html-to-image";
 import { Toaster, toast } from "sonner";
 
-// Helper: wait for ticket readiness signal from the Ticket component
-// Returns true if the ticket signalled readiness before timeout, false otherwise.
-const waitForTicketReady = (root: Element | null, timeout = 3000): Promise<boolean> =>
-  new Promise((resolve) => {
+// Enhanced helper with retry logic
+const waitForTicketReady = (
+  root: Element | null, 
+  timeout = 5000,
+  retries = 3
+): Promise<boolean> => {
+  return new Promise(async (resolve) => {
     if (!root) return resolve(false);
-    try {
-      if (root.getAttribute("data-logo-loaded") === "true") return resolve(true);
-      let tid: number;
-      const onReady = () => {
-        cleanup();
+    
+    let attemptCount = 0;
+    
+    const attemptCheck = async (): Promise<boolean> => {
+      attemptCount++;
+      
+      // Check if already ready
+      if (root.getAttribute("data-logo-loaded") === "true") {
+        return true;
+      }
+      
+      // Wait for event
+      return new Promise((innerResolve) => {
+        let tid: number;
+        
+        const onReady = () => {
+          cleanup();
+          innerResolve(true);
+        };
+        
+        const onTimeout = () => {
+          cleanup();
+          innerResolve(false);
+        };
+        
+        const cleanup = () => {
+          try {
+            root.removeEventListener("ticket-ready", onReady);
+          } catch (e) {
+            /* ignore */
+          }
+          clearTimeout(tid);
+        };
+        
+        root.addEventListener("ticket-ready", onReady, { once: true });
+        tid = setTimeout(onTimeout, timeout) as unknown as number;
+      });
+    };
+    
+    // Try with retries
+    for (let i = 0; i < retries; i++) {
+      const ready = await attemptCheck();
+      if (ready) {
         resolve(true);
-      };
-      const onTimeout = () => {
-        cleanup();
-        resolve(false);
-      };
-      const cleanup = () => {
-        try {
-          root.removeEventListener("ticket-ready", onReady);
-        } catch (e) {
-          /* ignore */
-        }
-        clearTimeout(tid);
-      };
-      root.addEventListener("ticket-ready", onReady, { once: true });
-      tid = setTimeout(onTimeout, timeout) as unknown as number;
-    } catch (e) {
-      resolve(false);
+        return;
+      }
+      
+      // Wait a bit before retrying
+      if (i < retries - 1) {
+        await new Promise(r => setTimeout(r, 500));
+      }
     }
+    
+    resolve(false);
   });
+};
 
 function tickets() {
   // Steps: 1 = previous 'Generate Ticket' (already completed),
@@ -365,16 +399,19 @@ function tickets() {
                     // keep persisted form/ticket state so the generated ticket remains visible after reload
 
                     // Wait a tick for the ticket component to mount, then capture it
-                                      setTimeout(async () => {
+                    setTimeout(async () => {
                       try {
                         const node = ticketRef.current;
                         if (!node) return;
 
-                                          const ready = await waitForTicketReady(node, 3000);
-                                          if (!ready) {
-                                            toast.error("Ticket capture timed out. Please try again.");
-                                            return;
-                                          }
+                        // Wait for ticket to be ready with extended timeout and retries
+                        const ready = await waitForTicketReady(node, 5000, 3);
+                        if (!ready) {
+                          toast.warning("Logo may not have loaded completely. Sending ticket anyway...");
+                        }
+
+                        // Add extra delay to ensure everything is rendered
+                        await new Promise(r => setTimeout(r, 500));
 
                         // Temporarily override the root font-family to avoid html-to-image trying
                         // to read cross-origin font CSS rules (fonts.googleapis.com) which causes
@@ -385,20 +422,22 @@ function tickets() {
                           node.style.fontFamily =
                             'Arial, Roboto, system-ui, -apple-system, "Segoe UI", sans-serif';
 
-                          // Use JPEG with lower quality and a pixelRatio of 1 to reduce payload size.
+                          // Use JPEG with higher quality and better settings
                           // wait for webfonts to finish loading (if any), then a short delay
                           if (document.fonts && document.fonts.ready)
                             await document.fonts.ready;
-                          await new Promise((r) => setTimeout(r, 300));
+                          await new Promise((r) => setTimeout(r, 500));
 
                           // Force a 320px-wide exported image (intrinsic pixel width = 320)
                           // so that when pasted into Word it measures correctly.
                           // Use pixelRatio:1 to avoid high-DPI scaling (Word assumes 96 DPI).
                           const dataUrl = await toJpeg(node, {
-                            quality: 0.9,
+                            quality: 0.95, // Slightly higher quality
                             backgroundColor: "#ffffff",
                             width: 330,
+                            height: node.offsetHeight, // Explicitly set height
                             pixelRatio: 2,
+                            cacheBust: true, // Force fresh capture
                           });
                           // Send the generated image directly to the backend email endpoint
                           // after you have data.ticketId and dataUrl (from html-to-image)
@@ -442,7 +481,7 @@ function tickets() {
                       } catch (e) {
                         console.error("capture/send image failed", e);
                       }
-                    }, 250);
+                    }, 500); // Increased initial delay
                   } catch (err: any) {
                     setError(err.message || "Unknown error");
                   } finally {
@@ -482,22 +521,29 @@ function tickets() {
                       toast.error("Ticket view not ready to resend");
                       return;
                     }
-                        const ready = await waitForTicketReady(node, 3000);
-                        if (!ready) {
-                          toast.error("Ticket capture timed out. Please try resending.");
-                          return;
-                        }
+                    
+                    // Wait for ticket to be ready with extended timeout and retries
+                    const ready = await waitForTicketReady(node, 5000, 3);
+                    if (!ready) {
+                      toast.warning("Logo may not have loaded completely. Resending anyway...");
+                    }
+                    
+                    // Add extra delay to ensure everything is rendered
+                    await new Promise(r => setTimeout(r, 500));
+                    
                     setEmailSending(true);
                     const originalFont = node.style.fontFamily;
                     try {
                       node.style.fontFamily = 'Arial, Roboto, system-ui, -apple-system, "Segoe UI", sans-serif';
                       if (document.fonts && document.fonts.ready) await document.fonts.ready;
-                      await new Promise((r) => setTimeout(r, 200));
+                      await new Promise((r) => setTimeout(r, 500));
                       const dataUrl = await toJpeg(node, {
-                        quality: 0.9,
+                        quality: 0.95, // Higher quality
                         backgroundColor: "#ffffff",
                         width: 330,
+                        height: node.offsetHeight, // Explicitly set height
                         pixelRatio: 2,
+                        cacheBust: true, // Force fresh capture
                       });
                       const resp = await fetch(`${API_BASE}/api/tickets/email`, {
                         method: "POST",
