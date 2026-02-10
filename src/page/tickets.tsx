@@ -404,14 +404,32 @@ function tickets() {
                         const node = ticketRef.current;
                         if (!node) return;
 
+                        console.log("Starting ticket capture process...");
+                        
                         // Wait for ticket to be ready with extended timeout and retries
                         const ready = await waitForTicketReady(node, 5000, 3);
+                        console.log("Ticket ready status:", ready);
+                        
                         if (!ready) {
                           toast.warning("Logo may not have loaded completely. Sending ticket anyway...");
                         }
 
                         // Add extra delay to ensure everything is rendered
-                        await new Promise(r => setTimeout(r, 500));
+                        await new Promise(r => setTimeout(r, 1000)); // Increased delay
+
+                        // Check if logo is actually loaded
+                        const logoImg = node.querySelector('img');
+                        if (logoImg) {
+                          console.log("Logo element found:", logoImg.src);
+                          console.log("Logo natural dimensions:", logoImg.naturalWidth, "x", logoImg.naturalHeight);
+                          console.log("Logo display dimensions:", logoImg.width, "x", logoImg.height);
+                          
+                          // Wait a bit more if logo isn't fully loaded
+                          if (logoImg.naturalWidth === 0) {
+                            console.log("Logo not fully loaded, waiting extra time...");
+                            await new Promise(r => setTimeout(r, 2000));
+                          }
+                        }
 
                         // Temporarily override the root font-family to avoid html-to-image trying
                         // to read cross-origin font CSS rules (fonts.googleapis.com) which causes
@@ -426,8 +444,10 @@ function tickets() {
                           // wait for webfonts to finish loading (if any), then a short delay
                           if (document.fonts && document.fonts.ready)
                             await document.fonts.ready;
-                          await new Promise((r) => setTimeout(r, 500));
+                          await new Promise((r) => setTimeout(r, 1000)); // Increased delay
 
+                          console.log("Starting image capture...");
+                          
                           // Force a 320px-wide exported image (intrinsic pixel width = 320)
                           // so that when pasted into Word it measures correctly.
                           // Use pixelRatio:1 to avoid high-DPI scaling (Word assumes 96 DPI).
@@ -438,7 +458,13 @@ function tickets() {
                             height: node.offsetHeight, // Explicitly set height
                             pixelRatio: 2,
                             cacheBust: true, // Force fresh capture
+                            filter: (_node) => {
+                              // Ensure we don't filter out the logo
+                              return true;
+                            }
                           });
+                          
+                          console.log("Image captured successfully, length:", dataUrl.length);
                           // Send the generated image directly to the backend email endpoint
                           // after you have data.ticketId and dataUrl (from html-to-image)
                           try {
@@ -516,6 +542,7 @@ function tickets() {
               <button
                 onClick={async () => {
                   try {
+                    console.log("Starting resend process...");
                     const node = ticketRef.current;
                     if (!node) {
                       toast.error("Ticket view not ready to resend");
@@ -524,19 +551,37 @@ function tickets() {
                     
                     // Wait for ticket to be ready with extended timeout and retries
                     const ready = await waitForTicketReady(node, 5000, 3);
+                    console.log("Resend - Ticket ready status:", ready);
+                    
                     if (!ready) {
                       toast.warning("Logo may not have loaded completely. Resending anyway...");
                     }
                     
                     // Add extra delay to ensure everything is rendered
-                    await new Promise(r => setTimeout(r, 500));
+                    await new Promise(r => setTimeout(r, 1000));
+                    
+                    // Check if logo is actually loaded
+                    const logoImg = node.querySelector('img');
+                    if (logoImg) {
+                      console.log("Resend - Logo element found:", logoImg.src);
+                      console.log("Resend - Logo natural dimensions:", logoImg.naturalWidth, "x", logoImg.naturalHeight);
+                      
+                      // Wait a bit more if logo isn't fully loaded
+                      if (logoImg.naturalWidth === 0) {
+                        console.log("Resend - Logo not fully loaded, waiting extra time...");
+                        await new Promise(r => setTimeout(r, 2000));
+                      }
+                    }
                     
                     setEmailSending(true);
                     const originalFont = node.style.fontFamily;
                     try {
                       node.style.fontFamily = 'Arial, Roboto, system-ui, -apple-system, "Segoe UI", sans-serif';
                       if (document.fonts && document.fonts.ready) await document.fonts.ready;
-                      await new Promise((r) => setTimeout(r, 500));
+                      await new Promise((r) => setTimeout(r, 1000));
+                      
+                      console.log("Resend - Starting image capture...");
+                      
                       const dataUrl = await toJpeg(node, {
                         quality: 0.95, // Higher quality
                         backgroundColor: "#ffffff",
@@ -544,7 +589,13 @@ function tickets() {
                         height: node.offsetHeight, // Explicitly set height
                         pixelRatio: 2,
                         cacheBust: true, // Force fresh capture
+                        filter: (_node) => {
+                          // Ensure we don't filter out the logo
+                          return true;
+                        }
                       });
+                      
+                      console.log("Resend - Image captured successfully, length:", dataUrl.length);
                       const resp = await fetch(`${API_BASE}/api/tickets/email`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },

@@ -11,19 +11,6 @@ interface TicketProps {
   rootRef?: RefObject<HTMLDivElement | null>;
 }
 
-// Preload and cache the logo
-const preloadLogo = (src: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error('Failed to load logo'));
-    img.src = src;
-  });
-};
-
-// Cache for the logo
-let logoCache: string | null = null;
-
 function Ticket({
   amount = "₦300",
   ticketId = "#DR-XXXXXXXX-XXX",
@@ -34,44 +21,6 @@ function Ticket({
   rootRef,
 }: TicketProps) {
   const [logoLoaded, setLogoLoaded] = useState(false);
-  const [logoSrc, setLogoSrc] = useState<string>("/logo1.webp");
-  
-  // Preload logo on mount
-  useEffect(() => {
-    const loadLogo = async () => {
-      try {
-        // Try to use cached logo first
-        if (logoCache) {
-          setLogoSrc(logoCache);
-          setLogoLoaded(true);
-          return;
-        }
-        
-        // Preload the logo
-        await preloadLogo("/logo1.webp");
-        
-        // Convert to base64 for better reliability
-        const response = await fetch("/logo1.webp");
-        const blob = await response.blob();
-        const reader = new FileReader();
-        
-        reader.onloadend = () => {
-          const base64 = reader.result as string;
-          logoCache = base64; // Cache the base64
-          setLogoSrc(base64);
-          setLogoLoaded(true);
-        };
-        
-        reader.readAsDataURL(blob);
-      } catch (error) {
-        console.error("Failed to preload logo:", error);
-        // Still mark as loaded to prevent blocking forever
-        setLogoLoaded(true);
-      }
-    };
-    
-    loadLogo();
-  }, []);
   // If ticketId is available and no explicit qrValue provided, link to the app's /verify route
   if (!qrValue && typeof window !== "undefined" && ticketId) {
     try {
@@ -123,15 +72,17 @@ function Ticket({
         <p className="text-right p-3 font-bold ">{amount}</p>
         <div className="flex justify-center items-center ">
           <img
-            src={logoSrc}
+            src="/logo1.webp"
             alt="DanRaph Ecocruise Logo"
             className="w-[100px] "
             onLoad={() => {
-              if (!logoLoaded) setLogoLoaded(true);
+              console.log("Logo loaded successfully");
+              setLogoLoaded(true);
             }}
             onError={() => {
               console.error("Logo failed to load in img tag");
-              if (!logoLoaded) setLogoLoaded(true);
+              // Still mark as loaded to prevent blocking forever
+              setLogoLoaded(true);
             }}
           />
         </div>
