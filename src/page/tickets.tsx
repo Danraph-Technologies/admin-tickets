@@ -41,8 +41,9 @@ const captureForIOS = async (node: HTMLElement) => {
     try {
       await toJpeg(node, { 
         quality: 0.1, 
-        pixelRatio: 1, 
-        width: 330,
+        pixelRatio: 2, 
+        width: 660,
+        height: node.scrollHeight * 2,
         backgroundColor: "#ffffff"
       });
     } catch (e) {
@@ -54,11 +55,11 @@ const captureForIOS = async (node: HTMLElement) => {
     
     // 6. Real capture with iOS-optimized settings
     const dataUrl = await toJpeg(node, {
-      quality: 0.95,
+      quality: 0.98, // Increased quality for sharper images
       backgroundColor: "#ffffff",
-      width: 330,
-      height: node.scrollHeight,
-      pixelRatio: 1, // Lower pixel ratio for iOS compatibility
+      width: 660, // Double width for better quality
+      height: node.scrollHeight * 2, // Double height
+      pixelRatio: 2, // Higher pixel ratio for sharper images
       skipAutoScale: true,
       style: {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
