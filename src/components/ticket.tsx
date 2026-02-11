@@ -90,19 +90,31 @@ function Ticket({
       <div
         ref={rootRef}
         className="bg-white max-w-[330px] w-full border "
-        style={{ width: 320 }}
+        style={{ width: 320, backgroundColor: '#ffffff' }} // Explicit background for Safari
         // Mark the DOM element as ready only when image logic is done
         data-ticket-ready={isReady ? "true" : "false"}
       >
         <p className="text-right p-3 font-bold ">{amount}</p>
-        <div className="flex justify-center items-center h-[110px]"> 
-          {/* Fixed height container prevents layout shift */}
+        <div className="flex justify-center items-center h-[110px] w-full"> 
+          {/* 
+             iPhone Fix: 
+             1. Key forces re-render when src changes 
+             2. explicit width attribute 
+             3. REMOVED crossOrigin="anonymous" 
+          */}
           <img
+            key={logoSrc} 
             src={logoSrc}
             alt="DanRaph Ecocruise Logo"
+            width="100" // Explicit attribute
+            height="100" // Explicit attribute (helps layout)
             className="w-[100px]"
-            // CRITICAL FOR HTML-TO-IMAGE:
-            crossOrigin="anonymous" 
+            style={{ 
+              width: '100px', 
+              height: 'auto', 
+              display: 'block',
+              objectFit: 'contain' 
+            }}
           />
         </div>
         <div className="text-center">

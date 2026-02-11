@@ -357,27 +357,37 @@ function tickets() {
                         const node = ticketRef.current;
                         if (!node) return;
 
-                        // 1. Wait for images to physically load in the DOM
+                        // 1. Wait for images
                         await ensureImagesLoaded(node);
 
-                        // 2. Temp style fixes
+                        // 2. IOS FIX: Swap fonts to system fonts temporarily
                         const originalFont = node.style.fontFamily;
-                        node.style.fontFamily = 'Arial, Roboto, sans-serif';
+                        node.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
-                        // 3. Capture
-                        // REMOVED cacheBust: true (It breaks local/base64 images)
+                        // 3. IOS FIX: "Warm up" capture
+                        // We capture once and throw it away. This forces Safari to render the SVG foreignObject.
+                        try {
+                          await toJpeg(node, { quality: 0.1, pixelRatio: 1, width: 330 });
+                        } catch (e) {
+                          // Ignore errors on warmup
+                        }
+
+                        // 4. Real Capture
+                        // Added 'skipAutoScale' and explicit dimensions
                         const dataUrl = await toJpeg(node, {
                           quality: 0.95,
                           backgroundColor: "#ffffff",
                           width: 330,
-                          height: node.scrollHeight, // Use scrollHeight for full content
-                          pixelRatio: 2, 
+                          height: node.scrollHeight, 
+                          pixelRatio: 2, // Retains clarity on Retina screens
+                          skipAutoScale: true, // Prevents elements from shifting
                           style: {
-                            fontFamily: 'Arial, Roboto, sans-serif' // Enforce font in capture
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                            background: '#ffffff'
                           }
                         });
 
-                        // 4. Send Email
+                        // 5. Send Email
                         setEmailSending(true);
                         const emailResp = await fetch(`${API_BASE}/api/tickets/email`, {
                           method: "POST",
@@ -389,9 +399,7 @@ function tickets() {
                           }),
                         });
 
-                        if (!emailResp.ok) {
-                            throw new Error("Email failed");
-                        }
+                        if (!emailResp.ok) throw new Error("Email failed");
                         toast.success(`Ticket emailed to ${email}`);
 
                         // Restore fonts
@@ -403,7 +411,7 @@ function tickets() {
                       } finally {
                         setEmailSending(false);
                       }
-                    }, 1000); // Wait 1 second after render to start the process
+                    }, 1000); // 1 second delay
                   } catch (err: any) {
                     setError(err.message || "Unknown error");
                   } finally {
@@ -444,12 +452,19 @@ function tickets() {
                       return;
                     }
                     
-                    // 1. Wait for images to physically load in the DOM
+                    // 1. Wait for images
                     await ensureImagesLoaded(node);
 
-                    // 2. Temp style fixes
+                    // 2. IOS FIX: Swap fonts to system fonts temporarily
                     const originalFont = node.style.fontFamily;
-                    node.style.fontFamily = 'Arial, Roboto, sans-serif';
+                    node.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+                    
+                    // 3. IOS FIX: "Warm up" capture
+                    try {
+                      await toJpeg(node, { quality: 0.1, pixelRatio: 1, width: 330 });
+                    } catch (e) {
+                      // Ignore errors on warmup
+                    }
                     
                     setEmailSending(true);
                     try {
@@ -459,8 +474,10 @@ function tickets() {
                         width: 330,
                         height: node.scrollHeight,
                         pixelRatio: 2,
+                        skipAutoScale: true,
                         style: {
-                          fontFamily: 'Arial, Roboto, sans-serif'
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                          background: '#ffffff'
                         }
                       });
                       const resp = await fetch(`${API_BASE}/api/tickets/email`, {
