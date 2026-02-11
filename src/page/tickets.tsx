@@ -58,13 +58,12 @@ const captureForIOS = async (node: HTMLElement) => {
       backgroundColor: "#ffffff",
       width: 330,
       height: node.scrollHeight,
-      pixelRatio: 2, // Increased to 2 for sharper text (standard for Retina screens)
+      pixelRatio: 1, // Lower pixel ratio for iOS compatibility
       skipAutoScale: true,
       style: {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
         background: '#ffffff',
         transform: 'translateZ(0)',
-        filter: 'brightness(1.05) contrast(1.02)', // brightness(1.05) increases brightness by 5%, contrast(1.02) increases contrast by 2% to keep text black
         '-webkit-font-smoothing': 'antialiased',
         '-moz-osx-font-smoothing': 'grayscale'
       } as any
