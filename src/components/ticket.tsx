@@ -13,6 +13,7 @@ interface TicketProps {
 
 // Global cache outside component to persist across re-renders
 let GLOBAL_LOGO_CACHE: string | null = null;
+let LOGO_LOAD_PROMISE: Promise<string> | null = null;
 
 function Ticket({
   amount = "₦300",
@@ -37,27 +38,67 @@ function Ticket({
         return;
       }
 
-      try {
-        // 2. Fetch and convert to Base64
-        const response = await fetch("/logo1.webp");
-        const blob = await response.blob();
-        
-        return new Promise<void>((resolve) => {
+      // 2. If already loading, wait for the existing promise
+      if (LOGO_LOAD_PROMISE) {
+        try {
+          const cachedLogo = await LOGO_LOAD_PROMISE;
+          if (mounted && cachedLogo) {
+            setLogoSrc(cachedLogo);
+            setIsReady(true);
+          }
+        } catch (error) {
+          console.error("Failed to load cached logo:", error);
+        }
+        return;
+      }
+
+      // 3. Start loading the logo
+      LOGO_LOAD_PROMISE = (async () => {
+        try {
+          // Try WebP first with timeout for mobile networks
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+          
+          let response = await fetch("/logo1.webp", { 
+            signal: controller.signal,
+            cache: 'force-cache' // Use cache aggressively on mobile
+          });
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            throw new Error("WebP not supported");
+          }
+          
+          const blob = await response.blob();
+          
+          return new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => {
-                if (!mounted) return;
-                const base64 = reader.result as string;
-                GLOBAL_LOGO_CACHE = base64; // Save to global cache
-                setLogoSrc(base64);
-                setIsReady(true);
-                resolve();
+              const base64 = reader.result as string;
+              GLOBAL_LOGO_CACHE = base64;
+              resolve(base64);
             };
+            reader.onerror = reject;
             reader.readAsDataURL(blob);
-        });
+          });
+        } catch (error) {
+          console.error("Logo fetch error:", error);
+          // iOS fallback: Use a simple SVG logo
+          const fallbackLogo = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjMDA0N0FFIi8+Cjx0ZXh0IHg9IjUwIiB5PSI0NSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+RGFuUmFwaDwvdGV4dD4KPHRleHQgeD0iNTAiIHk9IjY1IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5FY29jcnVpc2U8L3RleHQ+Cjwvc3ZnPgo=";
+          GLOBAL_LOGO_CACHE = fallbackLogo;
+          return fallbackLogo;
+        }
+      })();
+
+      try {
+        const logo = await LOGO_LOAD_PROMISE;
+        if (mounted) {
+          setLogoSrc(logo);
+          setIsReady(true);
+        }
       } catch (error) {
-        console.error("Logo fetch error:", error);
-        // Fallback to standard URL if fetch fails
-        if (mounted) setIsReady(true); 
+        console.error("Logo loading failed:", error);
+        if (mounted) setIsReady(true);
       }
     };
 
@@ -117,9 +158,9 @@ function Ticket({
             }}
           />
         </div>
-        <div className="text-center">
-          <h2 className="text-[25px] font-semibold ">DanRaph Ecocruise</h2>
-          <p className="font-[Montserrat] text-[15px] ">
+        <div className="text-center ios-fix">
+          <h2 className="text-[25px] font-semibold font-montserrat-fallback">DanRaph Ecocruise</h2>
+          <p className="font-[Montserrat] text-[15px] font-montserrat-fallback">
             Operator Of Maduka Shuttle Services
           </p>
         </div>
@@ -150,10 +191,10 @@ function Ticket({
         <div className="border-[1.3px] my-5 mx-5 "></div>
 
         <div className="pb-5">
-          <p className="text-center font-bold text-[19px] font-[Playfair_Display] ">
+          <p className="text-center font-bold text-[19px] font-[Playfair_Display] font-playfair-fallback ios-fix">
             Safe. Reliable. On Time
           </p>
-          <p className="text-center font-medium text-[14px] ">
+          <p className="text-center font-medium text-[14px] ios-fix">
             Call: 07032950309 | 09168071385 | 08037006559{" "}
           </p>
         </div>

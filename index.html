@@ -10,6 +10,51 @@
       href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Great+Vibes&family=Playfair+Display:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <style>
+      /* Font fallbacks for iOS */
+      .font-montserrat-fallback {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+      .font-playfair-fallback {
+        font-family: Georgia, "Times New Roman", Times, serif;
+      }
+      /* iOS-specific fixes */
+      @supports (-webkit-touch-callout: none) {
+        .ios-fix {
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+          transform: translateZ(0);
+          -webkit-transform: translateZ(0);
+        }
+        
+        /* Fix for iOS Safari viewport issues */
+        body {
+          -webkit-text-size-adjust: 100%;
+          -ms-text-size-adjust: 100%;
+        }
+        
+        /* Fix for image rendering on iOS */
+        img {
+          -webkit-transform: translateZ(0);
+          transform: translateZ(0);
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+        }
+        
+        /* Fix for canvas/svg rendering issues */
+        svg, canvas {
+          -webkit-transform: translateZ(0);
+          transform: translateZ(0);
+        }
+      }
+      
+      /* General mobile fixes */
+      * {
+        -webkit-tap-highlight-color: transparent;
+      }
+    </style>
 
     <title>adminticket</title>
   </head>
