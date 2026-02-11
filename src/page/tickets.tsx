@@ -4,69 +4,22 @@ import Ticket from "../components/ticket";
 import { toJpeg } from "html-to-image";
 import { Toaster, toast } from "sonner";
 
-// Enhanced helper with retry logic
-const waitForTicketReady = (
-  root: Element | null, 
-  timeout = 5000,
-  retries = 3
-): Promise<boolean> => {
-  return new Promise(async (resolve) => {
-    if (!root) return resolve(false);
-    
-    let attemptCount = 0;
-    
-    const attemptCheck = async (): Promise<boolean> => {
-      attemptCount++;
-      
-      // Check if already ready
-      if (root.getAttribute("data-logo-loaded") === "true") {
-        return true;
-      }
-      
-      // Wait for event
-      return new Promise((innerResolve) => {
-        let tid: number;
-        
-        const onReady = () => {
-          cleanup();
-          innerResolve(true);
-        };
-        
-        const onTimeout = () => {
-          cleanup();
-          innerResolve(false);
-        };
-        
-        const cleanup = () => {
-          try {
-            root.removeEventListener("ticket-ready", onReady);
-          } catch (e) {
-            /* ignore */
-          }
-          clearTimeout(tid);
-        };
-        
-        root.addEventListener("ticket-ready", onReady, { once: true });
-        tid = setTimeout(onTimeout, timeout) as unknown as number;
+// Add this helper function at the top of tickets.tsx
+const ensureImagesLoaded = async (root: HTMLElement) => {
+  const images = Array.from(root.getElementsByTagName("img"));
+  
+  await Promise.all(
+    images.map((img) => {
+      if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+      return new Promise((resolve) => {
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(true);
       });
-    };
-    
-    // Try with retries
-    for (let i = 0; i < retries; i++) {
-      const ready = await attemptCheck();
-      if (ready) {
-        resolve(true);
-        return;
-      }
-      
-      // Wait a bit before retrying
-      if (i < retries - 1) {
-        await new Promise(r => setTimeout(r, 500));
-      }
-    }
-    
-    resolve(false);
-  });
+    })
+  );
+  
+  // Extra safety wait for decoding
+  await new Promise((resolve) => setTimeout(resolve, 250));
 };
 
 function tickets() {
@@ -404,110 +357,53 @@ function tickets() {
                         const node = ticketRef.current;
                         if (!node) return;
 
-                        console.log("Starting ticket capture process...");
-                        
-                        // Wait for ticket to be ready with extended timeout and retries
-                        const ready = await waitForTicketReady(node, 5000, 3);
-                        console.log("Ticket ready status:", ready);
-                        
-                        if (!ready) {
-                          toast.warning("Logo may not have loaded completely. Sending ticket anyway...");
-                        }
+                        // 1. Wait for images to physically load in the DOM
+                        await ensureImagesLoaded(node);
 
-                        // Add extra delay to ensure everything is rendered
-                        await new Promise(r => setTimeout(r, 1000)); // Increased delay
-
-                        // Check if logo is actually loaded
-                        const logoImg = node.querySelector('img');
-                        if (logoImg) {
-                          console.log("Logo element found:", logoImg.src);
-                          console.log("Logo natural dimensions:", logoImg.naturalWidth, "x", logoImg.naturalHeight);
-                          console.log("Logo display dimensions:", logoImg.width, "x", logoImg.height);
-                          
-                          // Wait a bit more if logo isn't fully loaded
-                          if (logoImg.naturalWidth === 0) {
-                            console.log("Logo not fully loaded, waiting extra time...");
-                            await new Promise(r => setTimeout(r, 2000));
-                          }
-                        }
-
-                        // Temporarily override the root font-family to avoid html-to-image trying
-                        // to read cross-origin font CSS rules (fonts.googleapis.com) which causes
-                        // a SecurityError when accessing cssRules. This forces a system font during
-                        // capture and avoids embedding remote fonts.
+                        // 2. Temp style fixes
                         const originalFont = node.style.fontFamily;
-                        try {
-                          node.style.fontFamily =
-                            'Arial, Roboto, system-ui, -apple-system, "Segoe UI", sans-serif';
+                        node.style.fontFamily = 'Arial, Roboto, sans-serif';
 
-                          // Use JPEG with higher quality and better settings
-                          // wait for webfonts to finish loading (if any), then a short delay
-                          if (document.fonts && document.fonts.ready)
-                            await document.fonts.ready;
-                          await new Promise((r) => setTimeout(r, 1000)); // Increased delay
-
-                          console.log("Starting image capture...");
-                          
-                          // Force a 320px-wide exported image (intrinsic pixel width = 320)
-                          // so that when pasted into Word it measures correctly.
-                          // Use pixelRatio:1 to avoid high-DPI scaling (Word assumes 96 DPI).
-                          const dataUrl = await toJpeg(node, {
-                            quality: 0.95, // Slightly higher quality
-                            backgroundColor: "#ffffff",
-                            width: 330,
-                            height: node.offsetHeight, // Explicitly set height
-                            pixelRatio: 2,
-                            cacheBust: true, // Force fresh capture
-                            filter: (_node) => {
-                              // Ensure we don't filter out the logo
-                              return true;
-                            }
-                          });
-                          
-                          console.log("Image captured successfully, length:", dataUrl.length);
-                          // Send the generated image directly to the backend email endpoint
-                          // after you have data.ticketId and dataUrl (from html-to-image)
-                          try {
-                            setEmailSending(true);
-                            const emailResp = await fetch(
-                              `${API_BASE}/api/tickets/email`,
-                              {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                  ticketId: data.ticketId,
-                                  to: email,
-                                  imageDataUrl: dataUrl,
-                                }),
-                              }
-                            );
-
-                            if (!emailResp.ok) {
-                              const errBody = await emailResp
-                                .json()
-                                .catch(() => ({}));
-                              const msg =
-                                errBody?.error ||
-                                `Email failed (${emailResp.status})`;
-                              toast.error(`Failed to send email: ${msg}`);
-                            } else {
-                              toast.success(`Ticket emailed to ${email}`);
-                            }
-                          } finally {
-                            setEmailSending(false);
+                        // 3. Capture
+                        // REMOVED cacheBust: true (It breaks local/base64 images)
+                        const dataUrl = await toJpeg(node, {
+                          quality: 0.95,
+                          backgroundColor: "#ffffff",
+                          width: 330,
+                          height: node.scrollHeight, // Use scrollHeight for full content
+                          pixelRatio: 2, 
+                          style: {
+                            fontFamily: 'Arial, Roboto, sans-serif' // Enforce font in capture
                           }
-                        } finally {
-                          // restore original font
-                          try {
-                            node.style.fontFamily = originalFont || "";
-                          } catch (e) {
-                            /* ignore */
-                          }
+                        });
+
+                        // 4. Send Email
+                        setEmailSending(true);
+                        const emailResp = await fetch(`${API_BASE}/api/tickets/email`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            ticketId: data.ticketId,
+                            to: email,
+                            imageDataUrl: dataUrl,
+                          }),
+                        });
+
+                        if (!emailResp.ok) {
+                            throw new Error("Email failed");
                         }
+                        toast.success(`Ticket emailed to ${email}`);
+
+                        // Restore fonts
+                        node.style.fontFamily = originalFont;
+
                       } catch (e) {
-                        console.error("capture/send image failed", e);
+                        console.error("Capture failed:", e);
+                        toast.error("Failed to generate ticket image");
+                      } finally {
+                        setEmailSending(false);
                       }
-                    }, 500); // Increased initial delay
+                    }, 1000); // Wait 1 second after render to start the process
                   } catch (err: any) {
                     setError(err.message || "Unknown error");
                   } finally {
@@ -542,60 +438,31 @@ function tickets() {
               <button
                 onClick={async () => {
                   try {
-                    console.log("Starting resend process...");
                     const node = ticketRef.current;
                     if (!node) {
                       toast.error("Ticket view not ready to resend");
                       return;
                     }
                     
-                    // Wait for ticket to be ready with extended timeout and retries
-                    const ready = await waitForTicketReady(node, 5000, 3);
-                    console.log("Resend - Ticket ready status:", ready);
-                    
-                    if (!ready) {
-                      toast.warning("Logo may not have loaded completely. Resending anyway...");
-                    }
-                    
-                    // Add extra delay to ensure everything is rendered
-                    await new Promise(r => setTimeout(r, 1000));
-                    
-                    // Check if logo is actually loaded
-                    const logoImg = node.querySelector('img');
-                    if (logoImg) {
-                      console.log("Resend - Logo element found:", logoImg.src);
-                      console.log("Resend - Logo natural dimensions:", logoImg.naturalWidth, "x", logoImg.naturalHeight);
-                      
-                      // Wait a bit more if logo isn't fully loaded
-                      if (logoImg.naturalWidth === 0) {
-                        console.log("Resend - Logo not fully loaded, waiting extra time...");
-                        await new Promise(r => setTimeout(r, 2000));
-                      }
-                    }
+                    // 1. Wait for images to physically load in the DOM
+                    await ensureImagesLoaded(node);
+
+                    // 2. Temp style fixes
+                    const originalFont = node.style.fontFamily;
+                    node.style.fontFamily = 'Arial, Roboto, sans-serif';
                     
                     setEmailSending(true);
-                    const originalFont = node.style.fontFamily;
                     try {
-                      node.style.fontFamily = 'Arial, Roboto, system-ui, -apple-system, "Segoe UI", sans-serif';
-                      if (document.fonts && document.fonts.ready) await document.fonts.ready;
-                      await new Promise((r) => setTimeout(r, 1000));
-                      
-                      console.log("Resend - Starting image capture...");
-                      
                       const dataUrl = await toJpeg(node, {
-                        quality: 0.95, // Higher quality
+                        quality: 0.95,
                         backgroundColor: "#ffffff",
                         width: 330,
-                        height: node.offsetHeight, // Explicitly set height
+                        height: node.scrollHeight,
                         pixelRatio: 2,
-                        cacheBust: true, // Force fresh capture
-                        filter: (_node) => {
-                          // Ensure we don't filter out the logo
-                          return true;
+                        style: {
+                          fontFamily: 'Arial, Roboto, sans-serif'
                         }
                       });
-                      
-                      console.log("Resend - Image captured successfully, length:", dataUrl.length);
                       const resp = await fetch(`${API_BASE}/api/tickets/email`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -608,7 +475,8 @@ function tickets() {
                         toast.success(`Ticket resent to ${email}`);
                       }
                     } finally {
-                      try { node.style.fontFamily = originalFont || ""; } catch {}
+                      // Restore fonts
+                      node.style.fontFamily = originalFont;
                       setEmailSending(false);
                     }
                   } catch (e) {

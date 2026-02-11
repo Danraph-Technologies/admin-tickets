@@ -11,6 +11,9 @@ interface TicketProps {
   rootRef?: RefObject<HTMLDivElement | null>;
 }
 
+// Global cache outside component to persist across re-renders
+let GLOBAL_LOGO_CACHE: string | null = null;
+
 function Ticket({
   amount = "₦300",
   ticketId = "#DR-XXXXXXXX-XXX",
@@ -20,7 +23,48 @@ function Ticket({
   qrValue,
   rootRef,
 }: TicketProps) {
-  const [logoLoaded, setLogoLoaded] = useState(false);
+  const [logoSrc, setLogoSrc] = useState<string>("/logo1.webp"); // Default fallback
+  const [isReady, setIsReady] = useState(false);
+  
+  useEffect(() => {
+    let mounted = true;
+
+    const initLogo = async () => {
+      // 1. If we have it cached in memory, use it immediately
+      if (GLOBAL_LOGO_CACHE) {
+        setLogoSrc(GLOBAL_LOGO_CACHE);
+        setIsReady(true);
+        return;
+      }
+
+      try {
+        // 2. Fetch and convert to Base64
+        const response = await fetch("/logo1.webp");
+        const blob = await response.blob();
+        
+        return new Promise<void>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                if (!mounted) return;
+                const base64 = reader.result as string;
+                GLOBAL_LOGO_CACHE = base64; // Save to global cache
+                setLogoSrc(base64);
+                setIsReady(true);
+                resolve();
+            };
+            reader.readAsDataURL(blob);
+        });
+      } catch (error) {
+        console.error("Logo fetch error:", error);
+        // Fallback to standard URL if fetch fails
+        if (mounted) setIsReady(true); 
+      }
+    };
+
+    initLogo();
+
+    return () => { mounted = false; };
+  }, []);
   // If ticketId is available and no explicit qrValue provided, link to the app's /verify route
   if (!qrValue && typeof window !== "undefined" && ticketId) {
     try {
@@ -40,25 +84,6 @@ function Ticket({
       year: "numeric",
     });
 
-  // When the logo finishes loading, dispatch a DOM event so external
-  // consumers (like html-to-image) can wait for the ticket to be ready.
-  useEffect(() => {
-    if (!logoLoaded) return;
-    try {
-      const root = rootRef && (rootRef as RefObject<HTMLDivElement | null>)?.current;
-      if (root) {
-        // Set the attribute again to be safe
-        root.setAttribute("data-logo-loaded", "true");
-        const ev = new CustomEvent("ticket-ready", { 
-          detail: { logoLoaded: true },
-          bubbles: true 
-        });
-        root.dispatchEvent(ev);
-      }
-    } catch (e) {
-      console.error("Failed to dispatch ticket-ready event:", e);
-    }
-  }, [logoLoaded, rootRef]);
 
   return (
     <div className="flex justify-center items-center">
@@ -66,24 +91,18 @@ function Ticket({
         ref={rootRef}
         className="bg-white max-w-[330px] w-full border "
         style={{ width: 320 }}
-        // add an attribute that external code can check: data-logo-loaded
-        data-logo-loaded={logoLoaded}
+        // Mark the DOM element as ready only when image logic is done
+        data-ticket-ready={isReady ? "true" : "false"}
       >
         <p className="text-right p-3 font-bold ">{amount}</p>
-        <div className="flex justify-center items-center ">
+        <div className="flex justify-center items-center h-[110px]"> 
+          {/* Fixed height container prevents layout shift */}
           <img
-            src="/logo1.webp"
+            src={logoSrc}
             alt="DanRaph Ecocruise Logo"
-            className="w-[100px] "
-            onLoad={() => {
-              console.log("Logo loaded successfully");
-              setLogoLoaded(true);
-            }}
-            onError={() => {
-              console.error("Logo failed to load in img tag");
-              // Still mark as loaded to prevent blocking forever
-              setLogoLoaded(true);
-            }}
+            className="w-[100px]"
+            // CRITICAL FOR HTML-TO-IMAGE:
+            crossOrigin="anonymous" 
           />
         </div>
         <div className="text-center">
