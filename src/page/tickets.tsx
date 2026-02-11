@@ -32,16 +32,19 @@ const captureForIOS = async (node: HTMLElement) => {
     await document.fonts.ready;
   }
   
-  // 3. iOS-specific: Force GPU acceleration
+  // 3. iOS-specific: Force GPU acceleration and brightness boost
   const originalTransform = node.style.transform;
+  const originalFilter = node.style.filter; // Store original filter
+  
   node.style.transform = 'translateZ(0)';
+  node.style.filter = 'brightness(1.1) contrast(1.05)'; // Boost brightness and contrast
   
   try {
     // 4. Warm up capture with low quality (iOS Safari needs this)
     try {
       await toJpeg(node, { 
         quality: 0.1, 
-        pixelRatio: 1, 
+        pixelRatio: 2, // Changed from 1 to 2 for better quality
         width: 330,
         backgroundColor: "#ffffff"
       });
@@ -58,7 +61,7 @@ const captureForIOS = async (node: HTMLElement) => {
       backgroundColor: "#ffffff",
       width: 330,
       height: node.scrollHeight,
-      pixelRatio: 1, // Lower pixel ratio for iOS compatibility
+      pixelRatio: 2, // Changed from 1 to 2 for better quality
       skipAutoScale: true,
       style: {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
@@ -71,8 +74,9 @@ const captureForIOS = async (node: HTMLElement) => {
     
     return dataUrl;
   } finally {
-    // Restore original transform
+    // Restore original transform and filter
     node.style.transform = originalTransform;
+    node.style.filter = originalFilter;
   }
 };
 
